@@ -1,8 +1,12 @@
 [package]
-name = "sql_barser"
+name = "sqlbarser"
 version = "0.1.0"
+authors = ["Super Bo <supernbo@gmail.com>"]
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+license = "MIT"
+readme = "README.md"
+keywords = ["parser", "sql", "parsing", "bigquery", "snowflake"]
+categories = ["parsing"]
 
 [dependencies]
+nom = "7.1.1"
