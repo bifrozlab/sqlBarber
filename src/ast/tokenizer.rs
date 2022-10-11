@@ -17,6 +17,7 @@ pub fn tokenize_number(text: &String) -> Result<Token, TokenizerError> {
     Ok(Number(number))
 }
 
+#[cfg(test)]
 mod tests {
     use crate::ast::token::Token::Number;
     use crate::ast::token::{ErrorType, TokenizerError};
