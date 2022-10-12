@@ -1,4 +1,4 @@
-use sqlbarser::ast::token;
+use sqlbarser::tokenizer::token;
 
 fn main() {
 
