@@ -6,3 +6,5 @@ More specifically, we want to build a parser with following capabilities:
 - Accessing tables and columns of each tables.
 - Data linage of the query (e.g which columns derivied the final columns).
 - Multiple language interface (Rust, Python, Java, ...)
+
+

@@ -1,0 +1,313 @@
+syntax = "proto3";
+
+option go_package = "sql-barber";
+
+package sql;
+
+/* Common superclass for all Scans, which are nodes that produce rows
+  (e.g. scans, joins, table subqueries).
+
+  Each Scan has a <column_list> that says what columns are produced.
+  The Scan logically produces a stream of output rows, where each row
+  has exactly these columns.
+
+  Each Scan may have an attached <hint_list>, storing each hint as
+  a ResolvedOption.
+
+  If <is_ordered> is true, this Scan produces an ordered output, either
+  by generating order itself (OrderByScan) or by preserving the order
+  of its single input scan (LimitOffsetScan, ProjectScan, or WithScan).
+ */
+message Scan {
+  bool is_ordered = 1;
+  repeated Column column_list = 2;
+  repeated Option hint_list = 3;
+  ScanEnum kind = 4;
+  oneof scan_type {
+    AggregateScan = 5;
+    AnalyticScan = 6;
+    ArrayScan = 7;
+    FilterScan = 8;
+    GroupRowsScan = 9;
+    JoinScan = 10;
+    LimitOffsetScan = 11;
+    OrderByScan = 12;
+    PivotScan = 13;
+    ProjectScan = 14;
+    RecursiveRefScan = 15;
+    RecursiveScan = 16;
+    RelationArgumentScan = 17;
+    SampleScan = 18;
+    SetOperationScan = 19;
+    SingleRowScan = 20;
+    TVFScan = 21;
+    TableScan = 22;
+    UnpivotScan = 23;
+    WithRefScan = 24;
+    WithScan = 25;
+  }
+}
+
+// Enum of Scan subtypes
+enum ScanEnum {
+  SCAN_AGGREGATE = 0;
+  SCAN_ANALYTIC = 1;
+  SCAN_ARRAY = 2;
+  SCAN_FILTER = 3;
+  SCAN_GROUP_ROW = 4;
+  SCAN_JOIN = 5;
+  SCAN_LIMIT_OFFSET = 6;
+  SCAN_ORDER = 7;
+  SCAN_PIVOT = 8;
+  SCAN_PROJECT = 9;
+  SCAN_RECURSIVE_REF = 10;
+  SCAN_RECURSIVE = 11;
+  SCAN_RELATION_ARGUMENT = 12;
+  SCAN_SAMPLE = 13;
+  SCAN_SET_OPERATION = 14;
+  SCAN_SINGLE_ROW = 15;
+  SCAN_TVF = 16;
+  SCAN_TABLE = 17;
+  SCAN_UNPIVOT = 18;
+  SCAN_WITH_REF = 19;
+  SCAN_WITH = 20;
+}
+
+// Scan Subtypes
+
+
+// Apply analytic functions to rows produced from input_scan.
+//
+// The set of analytic functions are partitioned into a list of analytic
+// function groups <function_group_list> by the window PARTITION BY and the
+// window ORDER BY.
+//
+// The output <column_list> contains all columns from <input_scan>,
+// one column per analytic function. It may also conain partitioning/ordering
+// expression columns if they reference to select columns.
+message AnalyticScan {
+  Scan input_scan = 1;
+  repeated AnalyticFunctionGroup function_group_list = 2;
+}
+
+message ArrayScan {
+  Scan input_scan = 1;
+}
+
+message FilterScan {
+  Scan input_scan = 1;
+  Expr filter_expr = 2;
+}
+
+message GroupRowsScan {
+  string alias = 1;
+  repeated ComputedColumn input_column_list = 2; 
+}
+
+enum JoinType {
+  INNER_JOIN = 0;
+  LEFT_JOIN = 1;
+  RIGHT_JOIN = 2;
+  FULL_JOIN = 3;
+}
+
+message JoinScan {
+  JoinType join_type = 1;
+  Scan left_scan = 2;
+  Scan right_scan = 3;
+  Expr join_expr = 4;
+}
+
+message LimitOffsetScan {
+  Scan input_scan = 1;
+  Expr limit = 2;
+  Expr offset = 3;
+}
+
+// Apply ordering to rows produced from input_scan, and output ordered
+// rows.
+//
+// The <order_by_item_list> must not be empty.  Each element identifies
+// a sort column and indicates direction (ascending or descending).
+//
+// Order Preservation:
+//   A ResolvedScan produces an ordered output if it has <is_ordered>=true.
+//   If <is_ordered>=false, the scan may discard order.  This can happen
+//   even for a ResolvedOrderByScan, if it is the top-level scan in a
+//   subquery (which discards order).
+//
+// The following Scan nodes may have <is_ordered>=true, producing or
+// propagating an ordering:
+//   * ResolvedOrderByScan
+//   * ResolvedLimitOffsetScan
+//   * ResolvedProjectScan
+//   * ResolvedWithScan
+// Other Scan nodes will always discard ordering.
+message OrderByScan {
+  Scan input_scan = 1;
+  repeated OrderByItem order_by_item_list = 2;
+}
+
+message PivotScan {
+  Scan input_scan = 1;
+  repeated ComputedColumn group_by_list = 2;
+  repeated Expr pivot_expr_list = 3;
+  Expr for_expr = 4;
+  repeated Expr pivot_value_list = 5;
+  repeated PivotColumn pivot_column_list = 6;
+}
+
+message ProjectScan {
+  Scan input_scan = 1;
+  repeated ComputedColumn expr_list = 2;
+}
+
+message RecursiveRefScan {
+}
+
+message RecursiveScan {
+
+}
+
+message RelationArgumentScan {
+}
+
+// Samples rows from <input_scan>.
+// Specs: (broken link)
+// Specs for WITH WEIGHT and PARTITION BY: (broken link)
+//
+// <method> is the identifier for the sampling algorithm and will always be
+// in lowercase.
+// For example BERNOULLI, RESERVOIR, SYSTEM. Engines can also support their
+// own implementation-specific set of sampling algorithms.
+//
+// <size> and <unit> specifies the sample size.
+// If <unit> is "ROWS", <size> must be an <int64> and non-negative.
+// If <unit> is "PERCENT", <size> must either be a <double> or an <int64> and
+// in the range [0, 100].
+// <size> can only be a literal value or a (possibly casted) parameter.
+//
+// <repeatable_argument> is present if we had a REPEATABLE(<argument>) in the
+// TABLESAMPLE clause and can only be a literal value or a (possibly
+// casted) parameter.
+//
+// If present, <weight_column> defines the column produced by this scan that
+// stores the scaling weight for the corresponding sampled row.
+//
+// <partition_by_list> can be empty. If <partition_by_list> is not empty,
+// <unit> must be ROWS and <method> must be RESERVOIR.
+message SampleScan {
+  Scan input_scan = 1;
+  string method = 2;
+  Expr size = 3;
+  SampleUnit unit = 4;
+  Expr repeatable_argument = 5;
+  ColumnHolder weight_column = 6;
+  repeated Expr partition_by_list = 7;
+}
+
+message SetOperationScan {
+  SetOperationScanEnum op_type = 1;
+  repeated SetOperationItem input_item_list = 2;
+}
+
+enum SetOperationScanEnum {
+  UNION_ALL = 0;
+  UNION_DISTINCT = 1;
+  INTERSECT_ALL = 2;
+  INTERSECT_DISTINCT 3;
+  EXCEPT_ALL = 4;
+  EXCEPT_DISTINCT = 5;
+}
+
+// Scan that produces a single row with no columns.  Used for queries without
+// a FROM clause, where all output comes from the select list.
+message SingleRowScan  {
+}
+
+message TVFScan {
+}
+
+// Scan a Table.
+// The <column_list>[i] should be matched to a Table column by
+// <table>.GetColumn(<column_index_list>[i]).
+//
+// If AnalyzerOptions::prune_unused_columns is true, the <column_list> and
+// <column_index_list> will include only columns that were referenced
+// in the user query. (SELECT * counts as referencing all columns.)
+// This column_list can then be used for column-level ACL checking on tables.
+// Pruning has no effect on value tables (the value is never pruned).
+//
+// for_system_time_expr when non NULL resolves to TIMESTAMP used in
+// FOR SYSTEM_TIME AS OF clause. The expression is expected to be constant
+// and no columns are visible to it.
+//
+// <column_index_list> This list matches 1-1 with the <column_list>, and
+// identifies the ordinal of the corresponding column in the <table>'s
+// column list.
+//
+// If provided, <alias> refers to an explicit alias which was used to
+// reference a Table in the user query. If the Table was given an implicitly
+// generated alias, then defaults to "".
+message TableScan {
+  Table table = 1;
+  Expr for_system_time_expr = 2;
+  repeated uint32 column_index_list = 3;
+  string alias = 4;
+}
+
+message UnpivotScan {
+}
+
+message WithRefScan {
+  string with_query_name = 1;
+}
+
+message WithScan {
+  repeated WithEntry with_entry_list = 1;
+  bool recursive = 2;
+  Scan query = 3;
+}
+
+/* Statements */
+
+// SQL query statement. This is the outermost query statement that runs
+// and produces rows of output, like a SELECT. (The contained query may be
+// a Scan corresponding to a non-Select top-level operation like UNION ALL
+// or WITH.)
+//
+// <output_column_list> gives the user-visible column names that should be
+// returned in the API or query tools. There may be duplicate names, and
+// multiple output columns may reference the same column from <query>.
+message QueryStmt {
+  repeated OutputColumn output_column_list = 1;
+  bool is_value_table = 2;
+  Scan query = 3;
+}
+
+/* Columns */
+
+// Basic column type holds column information.
+message Column {
+  uint32 column_id = 1;
+  string table_name = 2;
+  string name = 3;
+  TypeProto type = 4;
+  string annotated_type = 5;
+}
+
+// Used in QueryStmt to provide a user-visible name for each column.
+message OutputColumn {
+  Column column = 1;
+  string name = 2;
+}
+
+// This is used when an expression is computed and given a name (a new
+// Column) that can be referenced elsewhere. The new Column
+// can appear in a column_list or in ColumnRefs in other expressions,
+// when appropriate. This node is not an expression itself - it is a
+// container that holds an expression.
+message ComputedColumn  {
+  Column column = 1;
+  Expr expr = 2;
+}

@@ -1,7 +1,8 @@
 [package]
-name = "sqlbarser"
-version = "0.1.0"
-authors = ["Super Bo <supernbo@gmail.com>"]
+name = "sqlbarber"
+description = "A SQL parser supports extracting table names and column names in a query"
+version = "0.0.1"
+authors = ["SuperBo <supernbo@gmail.com>", "Khang Dang <>"]
 edition = "2021"
 license = "MIT"
 readme = "README.md"
@@ -9,4 +10,7 @@ keywords = ["parser", "sql", "parsing", "bigquery", "snowflake"]
 categories = ["parsing"]
 
 [dependencies]
-nom = "7.1.1"
+tree-sitter = "~0.20.9"
+
+[build-dependencies]
+cc = "1.0"

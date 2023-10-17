@@ -8,5 +8,7 @@ More specifically, we want to build a _parser_ with following capabilities:
  - Can return Data linage of the query (e.g which columns derivied the final columns). 
  - Supports multiple language interface (at least Python and Java) so that we can plug it in many different usecases.
 
-For more details of the current landscape of SQL Parser and the problem we are trying to tackle, you should take a view at this blog.
-https://hackernoon.com/14-open-source-sql-parsers
+For more details of the current landscape of SQL Parser and the problem we are trying to tackle, you should take a view at these blogs.
+ - https://hackernoon.com/14-open-source-sql-parsers
+ - https://github.com/DTStack/dt-sql-parser
+ - https://sonra.io/sql-parser/sql-parser-use-cases/

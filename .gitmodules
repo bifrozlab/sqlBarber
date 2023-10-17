@@ -1,0 +1,3 @@
+[submodule "tree-sitter-universql"]
+	path = tree-sitter-universql
+	url = https://github.com/SuperBo/tree-sitter-universql.git
